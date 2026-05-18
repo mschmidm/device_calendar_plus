@@ -452,6 +452,7 @@ public class DeviceCalendarPlusIosPlugin: NSObject, FlutterPlugin, EKEventViewDe
     let url = args["url"] as? String
     let timeZone = args["timeZone"] as? String
     let recurrenceRule = args["recurrenceRule"] as? String
+    let reminders = args["reminders"] as? [Int]
 
     // Convert dates
     let startDate = Date(timeIntervalSince1970: TimeInterval(startDateMillis) / 1000.0)
@@ -468,7 +469,8 @@ public class DeviceCalendarPlusIosPlugin: NSObject, FlutterPlugin, EKEventViewDe
       url: url,
       timeZone: timeZone,
       availability: availability,
-      recurrenceRule: recurrenceRule
+      recurrenceRule: recurrenceRule,
+      reminders: reminders
     ) { serviceResult in
       DispatchQueue.main.async {
         switch serviceResult {
@@ -542,6 +544,7 @@ public class DeviceCalendarPlusIosPlugin: NSObject, FlutterPlugin, EKEventViewDe
     let isAllDay = args["isAllDay"] as? Bool
     let timeZone = args["timeZone"] as? String
     let availability = args["availability"] as? String
+    let reminders = args["reminders"] as? [Int]
 
     // Parse dates if provided
     let startDate: Date?
@@ -567,7 +570,8 @@ public class DeviceCalendarPlusIosPlugin: NSObject, FlutterPlugin, EKEventViewDe
       location: location,
       isAllDay: isAllDay,
       timeZone: timeZone,
-      availability: availability
+      availability: availability,
+      reminders: reminders
     ) { serviceResult in
       DispatchQueue.main.async {
         switch serviceResult {

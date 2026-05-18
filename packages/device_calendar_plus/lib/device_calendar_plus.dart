@@ -8,6 +8,7 @@ import 'src/event.dart';
 import 'src/event_availability.dart';
 import 'src/platform_exception_converter.dart';
 import 'src/recurrence_rule.dart';
+import 'src/reminder.dart';
 
 export 'package:device_calendar_plus_android/device_calendar_plus_android.dart'
     show CreateCalendarOptionsAndroid;
@@ -27,6 +28,7 @@ export 'src/event_availability.dart';
 export 'src/event_status.dart';
 export 'src/platform_exception_codes.dart';
 export 'src/recurrence_rule.dart';
+export 'src/reminder.dart';
 
 /// Main API for accessing device calendar functionality.
 class DeviceCalendar {
@@ -549,6 +551,8 @@ class DeviceCalendar {
   ///   The platform will validate the timezone string.
   /// [availability] is the availability status (default: EventAvailability.busy).
   /// [recurrenceRule] is an optional recurrence rule for repeating events.
+  /// [reminders] is an optional list of reminders/alarms for the event.
+  ///   Each [Reminder.minutesBefore] must be >= 0.
   ///
   /// Returns the system-generated event ID.
   /// Requires calendar write permissions - call [requestPermissions] first.
@@ -566,13 +570,14 @@ class DeviceCalendar {
   ///   url: 'https://example.com/meeting/123',
   /// );
   ///
-  /// // Create a recurring event
+  /// // Create a recurring event with reminders
   /// final recurringId = await plugin.createEvent(
   ///   calendarId: 'cal-123',
   ///   title: 'Daily Standup',
   ///   startDate: DateTime(2024, 3, 15, 9, 0),
   ///   endDate: DateTime(2024, 3, 15, 9, 15),
   ///   recurrenceRule: DailyRecurrence(end: CountEnd(30)),
+  ///   reminders: [Reminder(minutesBefore: 10)],
   /// );
   /// ```
   Future<String> createEvent({
@@ -587,6 +592,7 @@ class DeviceCalendar {
     String? timeZone,
     EventAvailability availability = EventAvailability.busy,
     RecurrenceRule? recurrenceRule,
+    List<Reminder>? reminders,
   }) async {
     // Validate required fields
     if (calendarId.trim().isEmpty) {
@@ -611,6 +617,9 @@ class DeviceCalendar {
       );
     }
 
+    // Validate reminders
+    _validateReminders(reminders);
+
     // Normalize dates for all-day events
     final normalizedStartDate = isAllDay ? _stripTime(startDate) : startDate;
     final normalizedEndDate = isAllDay ? _stripTime(endDate) : endDate;
@@ -629,6 +638,7 @@ class DeviceCalendar {
         timeZone,
         availability.name,
         recurrenceRule?.toRruleString(),
+        reminders?.map((r) => r.minutesBefore).toList(),
       );
       return eventId;
     } on PlatformException catch (e, stackTrace) {
@@ -713,6 +723,8 @@ class DeviceCalendar {
   ///   - Note: This reinterprets the local time, not preserving the instant
   ///   - Example: "3:00 PM EST" → "3:00 PM PST" (different instant in time)
   /// - [availability] - new availability status
+  /// - [reminders] - new list of reminders (replaces existing reminders).
+  ///   Each [Reminder.minutesBefore] must be >= 0.
   ///
   /// At least one field must be provided.
   /// Requires calendar write permissions - call [requestPermissions] first.
@@ -733,7 +745,7 @@ class DeviceCalendar {
   ///   isAllDay: true,
   /// );
   ///
-  /// // Update multiple fields
+  /// // Update multiple fields including reminders
   /// await plugin.updateEvent(
   ///   eventId: event.eventId,
   ///   title: 'Team Sync',
@@ -741,6 +753,7 @@ class DeviceCalendar {
   ///   endDate: DateTime(2024, 3, 20, 11, 0),
   ///   location: 'Conference Room B',
   ///   availability: EventAvailability.free,
+  ///   reminders: [Reminder(minutesBefore: 15), Reminder(minutesBefore: 60)],
   /// );
   /// ```
   // TODO(breaking): rename param to `id` and stop discarding the parsed
@@ -755,6 +768,7 @@ class DeviceCalendar {
     bool? isAllDay,
     String? timeZone,
     EventAvailability? availability,
+    List<Reminder>? reminders,
   }) async {
     // Validate eventId
     if (eventId.trim().isEmpty) {
@@ -773,11 +787,15 @@ class DeviceCalendar {
         location == null &&
         isAllDay == null &&
         timeZone == null &&
-        availability == null) {
+        availability == null &&
+        reminders == null) {
       throw ArgumentError(
         'At least one field must be provided to update',
       );
     }
+
+    // Validate reminders if provided
+    _validateReminders(reminders);
 
     // Validate dates if both are provided
     if (startDate != null && endDate != null && endDate.isBefore(startDate)) {
@@ -807,6 +825,7 @@ class DeviceCalendar {
         isAllDay: isAllDay,
         timeZone: timeZone,
         availability: availability?.name,
+        reminders: reminders?.map((r) => r.minutesBefore).toList(),
       );
     } on PlatformException catch (e, stackTrace) {
       final convertedException =
@@ -889,6 +908,20 @@ class DeviceCalendar {
         Error.throwWithStackTrace(convertedException, stackTrace);
       }
       rethrow;
+    }
+  }
+
+  /// Validates that all reminders have non-negative minutesBefore.
+  static void _validateReminders(List<Reminder>? reminders) {
+    if (reminders == null) return;
+    for (final reminder in reminders) {
+      if (reminder.minutesBefore < 0) {
+        throw ArgumentError.value(
+          reminder.minutesBefore,
+          'reminders',
+          'Reminder minutesBefore must be non-negative',
+        );
+      }
     }
   }
 

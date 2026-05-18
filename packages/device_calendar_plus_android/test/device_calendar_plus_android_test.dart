@@ -100,6 +100,7 @@ void main() {
         'America/New_York',
         'busy',
         null,
+        null,
       );
 
       expect(log[0].arguments['calendarId'], equals('cal-123'));

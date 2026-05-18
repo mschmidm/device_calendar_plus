@@ -160,6 +160,8 @@ abstract class DeviceCalendarPlusPlatform extends PlatformInterface {
   ///
   /// [recurrenceRule] is an optional RRULE string for recurring events.
   ///
+  /// [reminders] is an optional list of reminder minutes (each >= 0).
+  ///
   /// Returns the ID of the newly created event (system-generated).
   /// Requires calendar write permissions.
   Future<String> createEvent(
@@ -174,6 +176,7 @@ abstract class DeviceCalendarPlusPlatform extends PlatformInterface {
     String? timeZone,
     String availability,
     String? recurrenceRule,
+    List<int>? reminders,
   );
 
   /// Deletes an event from the device.
@@ -204,6 +207,7 @@ abstract class DeviceCalendarPlusPlatform extends PlatformInterface {
   /// - [isAllDay] - change between all-day and timed event
   /// - [timeZone] - new timezone identifier
   /// - [availability] - new availability identifier
+  /// - [reminders] - new list of reminder minutes (replaces existing)
   ///
   /// At least one field must be provided.
   /// Requires calendar write permissions.
@@ -217,6 +221,7 @@ abstract class DeviceCalendarPlusPlatform extends PlatformInterface {
     bool? isAllDay,
     String? timeZone,
     String? availability,
+    List<int>? reminders,
   });
 
   /// Opens the native calendar editor in create mode with optional pre-fill.

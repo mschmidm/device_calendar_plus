@@ -24,6 +24,7 @@ class MockDeviceCalendarPlusPlatform extends DeviceCalendarPlusPlatform
     String? timeZone,
     String availability,
     String? recurrenceRule,
+    List<int>? reminders,
   )? _createEventCallback;
 
   // Callback to capture updateEvent arguments
@@ -37,6 +38,7 @@ class MockDeviceCalendarPlusPlatform extends DeviceCalendarPlusPlatform
     bool? isAllDay,
     String? timeZone,
     String? availability,
+    List<int>? reminders,
   })? _updateEventCallback;
 
   void setPermissionStatus(CalendarPermissionStatus status) {
@@ -72,6 +74,7 @@ class MockDeviceCalendarPlusPlatform extends DeviceCalendarPlusPlatform
       String? timeZone,
       String availability,
       String? recurrenceRule,
+      List<int>? reminders,
     ) callback,
   ) {
     _createEventCallback = callback;
@@ -88,6 +91,7 @@ class MockDeviceCalendarPlusPlatform extends DeviceCalendarPlusPlatform
       bool? isAllDay,
       String? timeZone,
       String? availability,
+      List<int>? reminders,
     }) callback,
   ) {
     _updateEventCallback = callback;
@@ -177,6 +181,7 @@ class MockDeviceCalendarPlusPlatform extends DeviceCalendarPlusPlatform
     String? timeZone,
     String availability,
     String? recurrenceRule,
+    List<int>? reminders,
   ) async {
     if (_exceptionToThrow != null) throw _exceptionToThrow!;
     if (_createEventCallback != null) {
@@ -192,6 +197,7 @@ class MockDeviceCalendarPlusPlatform extends DeviceCalendarPlusPlatform
         timeZone,
         availability,
         recurrenceRule,
+        reminders,
       );
     }
     return 'mock-event-id';
@@ -213,6 +219,7 @@ class MockDeviceCalendarPlusPlatform extends DeviceCalendarPlusPlatform
     bool? isAllDay,
     String? timeZone,
     String? availability,
+    List<int>? reminders,
   }) async {
     if (_exceptionToThrow != null) throw _exceptionToThrow!;
     if (_updateEventCallback != null) {
@@ -226,6 +233,7 @@ class MockDeviceCalendarPlusPlatform extends DeviceCalendarPlusPlatform
         isAllDay: isAllDay,
         timeZone: timeZone,
         availability: availability,
+        reminders: reminders,
       );
     }
   }
@@ -477,6 +485,7 @@ void main() {
           timeZone,
           availability,
           recurrenceRule,
+          reminders,
         ) {
           capturedStart = startDate;
           capturedEnd = endDate;
@@ -526,6 +535,7 @@ void main() {
           timeZone,
           availability,
           recurrenceRule,
+          reminders,
         ) {
           capturedStart = startDate;
           capturedEnd = endDate;
@@ -660,6 +670,7 @@ void main() {
           isAllDay,
           timeZone,
           availability,
+          reminders,
         }) {
           capturedStart = startDate;
           capturedEnd = endDate;
@@ -783,6 +794,151 @@ void main() {
             ),
           ),
         );
+      });
+    });
+
+    group('createEvent reminders', () {
+      test('throws ArgumentError when reminder has negative minutesBefore', () async {
+        expect(
+          () => DeviceCalendar.instance.createEvent(
+            calendarId: 'cal-123',
+            title: 'Test',
+            startDate: DateTime(2024, 3, 15, 10, 0),
+            endDate: DateTime(2024, 3, 15, 11, 0),
+            reminders: [Reminder(minutesBefore: -5)],
+          ),
+          throwsArgumentError,
+        );
+      });
+
+      test('passes reminders to platform as List<int>', () async {
+        List<int>? capturedReminders;
+
+        final mock = MockDeviceCalendarPlusPlatform();
+        mock.setCreateEventCallback((
+          calendarId,
+          title,
+          startDate,
+          endDate,
+          isAllDay,
+          description,
+          location,
+          url,
+          timeZone,
+          availability,
+          recurrenceRule,
+          reminders,
+        ) {
+          capturedReminders = reminders;
+          return Future.value('event-123');
+        });
+        DeviceCalendarPlusPlatform.instance = mock;
+
+        await DeviceCalendar.instance.createEvent(
+          calendarId: 'cal-123',
+          title: 'Test',
+          startDate: DateTime(2024, 3, 15, 10, 0),
+          endDate: DateTime(2024, 3, 15, 11, 0),
+          reminders: [Reminder(minutesBefore: 10), Reminder(minutesBefore: 60)],
+        );
+
+        expect(capturedReminders, equals([10, 60]));
+      });
+
+    });
+
+    group('updateEvent reminders', () {
+      test('throws ArgumentError when reminder has negative minutesBefore', () async {
+        expect(
+          () => DeviceCalendar.instance.updateEvent(
+            eventId: 'event-123',
+            reminders: [Reminder(minutesBefore: -1)],
+          ),
+          throwsArgumentError,
+        );
+      });
+
+      test('accepts reminders as only update field', () async {
+        List<int>? capturedReminders;
+
+        final mock = MockDeviceCalendarPlusPlatform();
+        mock.setUpdateEventCallback((
+          eventId, {
+          title,
+          startDate,
+          endDate,
+          description,
+          location,
+          isAllDay,
+          timeZone,
+          availability,
+          reminders,
+        }) {
+          capturedReminders = reminders;
+          return Future.value();
+        });
+        DeviceCalendarPlusPlatform.instance = mock;
+
+        await DeviceCalendar.instance.updateEvent(
+          eventId: 'event-123',
+          reminders: [Reminder(minutesBefore: 30)],
+        );
+
+        expect(capturedReminders, equals([30]));
+      });
+
+      test('empty reminders list is passed through (clears reminders)', () async {
+        List<int>? capturedReminders;
+
+        final mock = MockDeviceCalendarPlusPlatform();
+        mock.setUpdateEventCallback((
+          eventId, {
+          title,
+          startDate,
+          endDate,
+          description,
+          location,
+          isAllDay,
+          timeZone,
+          availability,
+          reminders,
+        }) {
+          capturedReminders = reminders;
+          return Future.value();
+        });
+        DeviceCalendarPlusPlatform.instance = mock;
+
+        await DeviceCalendar.instance.updateEvent(
+          eventId: 'event-123',
+          reminders: [],
+        );
+
+        expect(capturedReminders, equals([]));
+      });
+    });
+
+    group('Event model reminders', () {
+      test('fromMap parses reminders correctly', () {
+        final map = {
+          'eventId': 'e1',
+          'instanceId': 'e1',
+          'calendarId': 'c1',
+          'title': 'Test',
+          'startDate': DateTime(2024, 3, 15).millisecondsSinceEpoch,
+          'endDate': DateTime(2024, 3, 16).millisecondsSinceEpoch,
+          'isAllDay': false,
+          'availability': 'busy',
+          'status': 'confirmed',
+          'isRecurring': false,
+          'reminders': [5, 15, 60],
+        };
+
+        final event = Event.fromMap(map);
+        expect(event.reminders, isNotNull);
+        expect(event.reminders!.length, 3);
+        expect(event.reminders![0], Reminder(minutesBefore: 5));
+        expect(event.reminders![1], Reminder(minutesBefore: 15));
+        expect(event.reminders![2], Reminder(minutesBefore: 60));
       });
     });
   });

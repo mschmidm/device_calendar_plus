@@ -204,6 +204,17 @@ class EventsService {
       }
     }
 
+    // Serialize reminders/alarms
+    if let alarms = event.alarms, !alarms.isEmpty {
+      let reminderMinutes: [Int] = alarms.compactMap { alarm in
+        let minutes = Int(alarm.relativeOffset / -60)
+        return minutes >= 0 ? minutes : nil
+      }
+      if !reminderMinutes.isEmpty {
+        eventMap["reminders"] = reminderMinutes
+      }
+    }
+
     return eventMap
   }
 
@@ -360,6 +371,7 @@ class EventsService {
     timeZone: String?,
     availability: String,
     recurrenceRule: String?,
+    reminders: [Int]?,
     completion: @escaping (Result<String, CalendarError>) -> Void
   ) {
     // Check permission - creating events only requires write access
@@ -430,6 +442,13 @@ class EventsService {
     // Set recurrence rule if provided
     if let rruleString = recurrenceRule, let rule = parseRecurrenceRule(rruleString) {
       event.recurrenceRules = [rule]
+    }
+    
+    // Set reminders/alarms if provided
+    if let reminders = reminders {
+      event.alarms = reminders.map { minutes in
+        EKAlarm(relativeOffset: TimeInterval(-minutes * 60))
+      }
     }
     
     // Save the event
@@ -784,6 +803,7 @@ class EventsService {
     isAllDay: Bool?,
     timeZone: String?,
     availability: String?,
+    reminders: [Int]?,
     completion: @escaping (Result<Void, CalendarError>) -> Void)
   {
     // Permission Check
@@ -825,6 +845,20 @@ class EventsService {
       case "unavailable": foundEvent.availability = .unavailable
       case "busy": foundEvent.availability = .busy
       default: break
+      }
+    }
+
+    // Update reminders/alarms if provided
+    if let reminders = reminders {
+      // Remove existing alarms
+      if let existingAlarms = foundEvent.alarms {
+        for alarm in existingAlarms {
+          foundEvent.removeAlarm(alarm)
+        }
+      }
+      // Add new alarms
+      for minutes in reminders {
+        foundEvent.addAlarm(EKAlarm(relativeOffset: TimeInterval(-minutes * 60)))
       }
     }
 

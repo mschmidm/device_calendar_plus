@@ -319,6 +319,12 @@ class EventsService(private val context: Context) {
             eventMap["attendees"] = attendees
         }
 
+        // Query reminders
+        val reminders = queryReminders(eventId.toLong())
+        if (reminders.isNotEmpty()) {
+            eventMap["reminders"] = reminders
+        }
+
         return eventMap
     }
 
@@ -391,6 +397,49 @@ class EventsService(private val context: Context) {
             CalendarContract.Attendees.ATTENDEE_STATUS_INVITED -> "pending"
             else -> "none"
         }
+    }
+
+    private fun queryReminders(eventId: Long): List<Int> {
+        val reminders = mutableListOf<Int>()
+
+        try {
+            context.contentResolver.query(
+                CalendarContract.Reminders.CONTENT_URI,
+                arrayOf(CalendarContract.Reminders.MINUTES),
+                "${CalendarContract.Reminders.EVENT_ID} = ?",
+                arrayOf(eventId.toString()),
+                null
+            )?.use { cursor ->
+                val minutesIdx = cursor.getColumnIndex(CalendarContract.Reminders.MINUTES)
+                while (cursor.moveToNext()) {
+                    val minutes = cursor.getInt(minutesIdx)
+                    reminders.add(minutes)
+                }
+            }
+        } catch (_: Exception) {
+            // Silently return empty if reminder query fails
+        }
+
+        return reminders
+    }
+
+    private fun insertReminders(eventId: Long, minutes: List<Int>) {
+        for (m in minutes) {
+            val values = android.content.ContentValues().apply {
+                put(CalendarContract.Reminders.EVENT_ID, eventId)
+                put(CalendarContract.Reminders.MINUTES, m)
+                put(CalendarContract.Reminders.METHOD, CalendarContract.Reminders.METHOD_ALERT)
+            }
+            context.contentResolver.insert(CalendarContract.Reminders.CONTENT_URI, values)
+        }
+    }
+
+    private fun deleteReminders(eventId: Long) {
+        context.contentResolver.delete(
+            CalendarContract.Reminders.CONTENT_URI,
+            "${CalendarContract.Reminders.EVENT_ID} = ?",
+            arrayOf(eventId.toString())
+        )
     }
     
     fun getEvent(eventId: String, timestamp: Long?): Result<Map<String, Any>?> {
@@ -625,7 +674,8 @@ class EventsService(private val context: Context) {
         url: String?,
         timeZone: String?,
         availability: String,
-        recurrenceRule: String?
+        recurrenceRule: String?,
+        reminders: List<Int>?
     ): Result<String> {
         // Check for write calendar permission
         if (android.content.pm.PackageManager.PERMISSION_GRANTED !=
@@ -735,6 +785,27 @@ class EventsService(private val context: Context) {
             if (uri != null) {
                 val eventId = uri.lastPathSegment
                 if (eventId != null) {
+                    // Insert reminders if provided
+                    if (reminders != null && reminders.isNotEmpty()) {
+                        try {
+                            insertReminders(eventId.toLong(), reminders)
+                        } catch (e: Exception) {
+                            // Clean up: delete the event we just created
+                            try {
+                                context.contentResolver.delete(
+                                    CalendarContract.Events.CONTENT_URI,
+                                    "${CalendarContract.Events._ID} = ?",
+                                    arrayOf(eventId)
+                                )
+                            } catch (_: Exception) { }
+                            return Result.failure(
+                                CalendarException(
+                                    PlatformExceptionCodes.OPERATION_FAILED,
+                                    "Failed to add reminders: ${e.message}"
+                                )
+                            )
+                        }
+                    }
                     return Result.success(eventId)
                 }
             }
@@ -818,7 +889,8 @@ class EventsService(private val context: Context) {
         location: String?,
         isAllDay: Boolean?,
         timeZone: String?,
-        availability: String?
+        availability: String?,
+        reminders: List<Int>?
     ): Result<Unit> {
         // Check for write calendar permission
         if (android.content.pm.PackageManager.PERMISSION_GRANTED !=
@@ -948,6 +1020,23 @@ class EventsService(private val context: Context) {
                         "Event with ID $eventId not found"
                     )
                 )
+            }
+
+            // Update reminders if provided
+            if (reminders != null) {
+                try {
+                    deleteReminders(eventId.toLong())
+                    if (reminders.isNotEmpty()) {
+                        insertReminders(eventId.toLong(), reminders)
+                    }
+                } catch (e: Exception) {
+                    return Result.failure(
+                        CalendarException(
+                            PlatformExceptionCodes.OPERATION_FAILED,
+                            "Failed to update reminders: ${e.message}"
+                        )
+                    )
+                }
             }
             
             return Result.success(Unit)

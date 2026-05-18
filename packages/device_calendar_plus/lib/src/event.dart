@@ -4,6 +4,7 @@ import 'attendee.dart';
 import 'event_availability.dart';
 import 'event_status.dart';
 import 'recurrence_rule.dart';
+import 'reminder.dart';
 
 /// Represents a calendar event.
 class Event {
@@ -111,6 +112,19 @@ class Event {
   ///   the plugin and is available to other apps reading the calendar.
   final String? url;
 
+  /// Reminders/alarms for this event.
+  ///
+  /// Each [Reminder] specifies how many minutes before the event start
+  /// a notification should fire.
+  ///
+  /// Null if the event has no reminders or reminders are not available.
+  ///
+  /// **Platform mapping:**
+  /// - **iOS**: maps to `EKAlarm` with `relativeOffset` (negative seconds).
+  /// - **Android**: maps to `CalendarContract.Reminders` table rows with
+  ///   `METHOD_ALERT`.
+  final List<Reminder>? reminders;
+
   Event({
     required this.eventId,
     required this.instanceId,
@@ -128,12 +142,14 @@ class Event {
     this.recurrenceRule,
     this.attendees,
     this.url,
+    this.reminders,
   });
 
   /// Creates an Event from a map returned by the platform.
   factory Event.fromMap(Map<String, dynamic> map) {
     final rruleString = map['recurrenceRule'] as String?;
     final attendeesList = map['attendees'] as List<dynamic>?;
+    final remindersList = map['reminders'] as List<dynamic>?;
     return Event(
       eventId: map['eventId'] as String,
       instanceId: map['instanceId'] as String,
@@ -155,6 +171,9 @@ class Event {
           ?.map((a) => Attendee.fromMap(Map<String, dynamic>.from(a as Map)))
           .toList(),
       url: map['url'] as String?,
+      reminders: remindersList
+          ?.map((m) => Reminder(minutesBefore: m as int))
+          .toList(),
     );
   }
 
@@ -183,6 +202,9 @@ class Event {
     if (attendees != null) {
       map['attendees'] = attendees!.map((a) => a.toMap()).toList();
     }
+    if (reminders != null) {
+      map['reminders'] = reminders!.map((r) => r.minutesBefore).toList();
+    }
 
     return map;
   }
@@ -190,7 +212,8 @@ class Event {
   @override
   String toString() {
     return 'Event(eventId: $eventId, instanceId: $instanceId, calendarId: $calendarId, title: $title, '
-        'startDate: $startDate, endDate: $endDate, isAllDay: $isAllDay, url: $url)';
+        'startDate: $startDate, endDate: $endDate, isAllDay: $isAllDay, url: $url, '
+        'reminders: $reminders)';
   }
 
   @override
@@ -213,7 +236,8 @@ class Event {
         other.isRecurring == isRecurring &&
         other.recurrenceRule == recurrenceRule &&
         listEquals(other.attendees, attendees) &&
-        other.url == url;
+        other.url == url &&
+        listEquals(other.reminders, reminders);
   }
 
   @override
@@ -235,6 +259,7 @@ class Event {
       recurrenceRule,
       attendees != null ? Object.hashAll(attendees!) : null,
       url,
+      reminders != null ? Object.hashAll(reminders!) : null,
     );
   }
 }

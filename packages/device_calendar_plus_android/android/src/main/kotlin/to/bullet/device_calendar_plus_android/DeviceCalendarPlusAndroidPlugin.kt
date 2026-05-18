@@ -392,6 +392,7 @@ class DeviceCalendarPlusAndroidPlugin :
         val timeZone = call.argument<String>("timeZone")
         val availability = call.argument<String>("availability")
         val recurrenceRule = call.argument<String>("recurrenceRule")
+        val reminders = call.argument<List<Int>>("reminders")
         
         // Validate required arguments
         if (calendarId == null || title == null || startDateMillis == null || 
@@ -418,7 +419,8 @@ class DeviceCalendarPlusAndroidPlugin :
             url,
             timeZone,
             availability,
-            recurrenceRule
+            recurrenceRule,
+            reminders
         )
         
         serviceResult.fold(
@@ -485,6 +487,7 @@ class DeviceCalendarPlusAndroidPlugin :
         val isAllDay = call.argument<Boolean>("isAllDay")
         val timeZone = call.argument<String>("timeZone")
         val availability = call.argument<String>("availability")
+        val reminders = call.argument<List<Int>>("reminders")
         
         // Convert dates if provided
         val startDate = startDateMillis?.let { java.util.Date(it) }
@@ -499,7 +502,8 @@ class DeviceCalendarPlusAndroidPlugin :
             location,
             isAllDay,
             timeZone,
-            availability
+            availability,
+            reminders
         )
         
         serviceResult.fold(
